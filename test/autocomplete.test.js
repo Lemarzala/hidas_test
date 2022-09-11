@@ -1,62 +1,53 @@
-const waitFor = (selector) => {
-  return new Promise((resolve, reject) => {
-    const interval = setInterval(() => {
-      if (document.querySelector(selector)) {
-        clearInterval(interval);
-        clearTimeout(timeout);
-        resolve();
-      }
-    }, 30);
+const createAutoComplete = ({
+  root,
+  renderOption,
+  onOptionSelect,
+  inputValue,
+  fetchData,
+}) => {
+  root.innerHTML = `
+    <label><b>Search</b></label>
+    <input class="input" />
+    <div class="dropdown">
+      <div class="dropdown-menu">
+        <div class="dropdown-content results"></div>
+      </div>
+    </div>
+  `;
 
-    const timeout = setTimeout(() => {
-      clearInterval(interval);
-      reject();
-    }, 2000);
+  const input = root.querySelector("input");
+  const dropdown = root.querySelector(".dropdown");
+  const resultsWrapper = root.querySelector(".results");
+
+  const onInput = async (event) => {
+    const items = await fetchData(event.target.value);
+
+    if (!items.length) {
+      dropdown.classList.remove("is-active");
+      return;
+    }
+
+    resultsWrapper.innerHTML = "";
+    dropdown.classList.add("is-active");
+    for (let item of items) {
+      const option = document.createElement("a");
+
+      option.classList.add("dropdown-item");
+      option.innerHTML = renderOption(item);
+      option.addEventListener("click", () => {
+        dropdown.classList.remove("is-active");
+        input.value = inputValue(item);
+        onOptionSelect(item);
+      });
+
+      resultsWrapper.appendChild(option);
+    }
+  };
+  input.addEventListener("input", debounce(onInput, 500));
+
+  document.addEventListener("click", (event) => {
+    if (!root.contains(event.target)) {
+      dropdown.classList.remove("is-active");
+    }
   });
 };
-
-beforeEach(() => {
-  document.querySelector("#target").innerHTML = "";
-  createAutoComplete({
-    root: document.querySelector("#target"),
-    fetchData() {
-      return [
-        { Title: "Avengers" },
-        { Title: "Not Avengers" },
-        { Title: "Some other movie" },
-      ];
-    },
-    renderOption(movie) {
-      return movie.Title;
-    },
-  });
-});
-
-it("Dropdown starts closed", () => {
-  const dropdown = document.querySelector(".dropdown");
-
-  expect(dropdown.className).not.to.include("is-active");
-});
-
-it("After searching, dropdown opens up", async () => {
-  const input = document.querySelector("input");
-  input.value = "avengers";
-  input.dispatchEvent(new Event("input"));
-
-  await waitFor(".dropdown-item");
-
-  const dropdown = document.querySelector(".dropdown");
-  expect(dropdown.className).to.include("is-active");
-});
-
-it("After searching, display some result", async () => {
-  const input = document.querySelector("input");
-  input.value = "avengers";
-  input.dispatchEvent(new Event("input"));
-
-  await waitFor(".dropdown-item");
-
-  const items = document.querySelectorAll(".dropdown-item");
-
-  expect(items.length).to.equal(3);
-});
